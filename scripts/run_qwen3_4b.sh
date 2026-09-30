@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 vllm serve /home/data2/models/Qwen3-4B --port 9801 --reasoning-parser deepseek_r1

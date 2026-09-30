@@ -1,0 +1,12 @@
+Example {example_index}:
+### Input:
+1. Patient basic information:
+Gender: {patient_gender}, Age: {patient_age}, Height/Weight: {patient_height}cm/{patient_weight}kg, Department: {department},
+
+2. Diagnosis and surgery:
+ASA grade: {assessment_asa}, Emergency surgery: {emop},
+Primary diagnosis (text): {diagnoses_text}, ICD code: {ICD},
+Preop labs: {preop_labs_summary}
+
+### Output (min):
+Surgery duration: {duration}

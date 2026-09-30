@@ -1,0 +1,24 @@
+示例 {example_index}：
+### 输入：
+一. 患者基本信息与健康检查情况:
+性别：{patient_gender}，年龄：{patient_age}，
+身高/体重：{patient_height}cm/{patient_weight}kg，住院科室：{department}，
+电解质检查是否异常：{diagnostic_electrolyte}，ECG检查是否异常：{diagnostic_ECG}，
+肝功能检查是否异常：{diagnostic_liver}，肾功能检查是否异常：{diagnostic_kidney}，
+体检红细胞数量：{diagnostic_CBC_RBC}，体检白细胞数量：{diagnostic_CBC_WBC}，
+体检血红蛋白数量：{diagnostic_CBC_HGB}，体检血小板数量：{diagnostic_CBC_PLT}，
+
+二. 手术基本信息:
+主要诊断：{diagnoses}，拟行手术名称：{procedures}，
+手术等级：{level}，总体评估时的ASA分级：{assessment_asa}，
+手术类型：{type}，手术位置：{position}，ICD编码：{ICD}，
+手术医生ID：{surgeons}，麻醉医生ID：{anesthesiologists}
+
+三. 术前访视评估与麻醉相关特征:
+拟选麻醉方法：{anesthesia}，是否有过敏史：{disease_allergies}，
+患者口腔开合度：{degree_of_mouth_opening}，患者颈部活动度评估：{neck_activity}，
+是否有吸烟史标识：{disease_smoking}，是否有酗酒史：{disease_alcoholism}，
+是否有呼吸系统病史：{disease_respiratory}，是否有神经系统病史：{disease_nerve}，是否有循环系统病史：{disease_circulatory}，
+
+### 输出(min)：
+手术时长：{duration}

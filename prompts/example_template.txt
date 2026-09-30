@@ -1,0 +1,35 @@
+示例 {example_index}：
+### 输入：
+一. 患者基本信息与健康状况:
+性别：{gender}，年龄：{age}，住院科室：{ward}
+肺功能是否异常：{lung_function_abnormal}，血气是否异常：{blood_gas_abnormal}，
+超声心动图是否异常：{echo_abnormal}，放射结果详述：{radiology_details}，
+心电图检查详细情况：{ecg_details}，凝血筛选详细情况：{coagulation_details}
+
+二. 手术类型和手术本身特征:
+拟行手术名称：{planned_surgery_name}，手术器械清点单手术名称：{instrument_check_surgery_name},
+手术开始时间：{surgery_start_time}，对应的手术类型：{surgery_type}
+
+三. 术前访视评估与麻醉相关特征:
+是否有吸烟史标识：{smoking_history}，是否有酗酒史：{alcohol_history}，
+呼吸系统病史：{resp_history}，神经系统病史：{neuro_history}，
+消化系统病史：{digest_history}，脊柱四肢病史：{spine_limb_history}，
+泌尿系统病史：{uro_history}，免疫系统病史：{immune_history}，
+其它系统病史异常情况：{other_sys_abn}，过敏史详情：{allergy_detail}，
+访视查体（一般情况）：{general_exam}，访视查体（心肺听诊）：{cardio_pulm_ausc}，
+访视手术史详情：{prior_surgery}，访视病史治疗情况：{treatment_history}，
+拟选麻醉方法：{planned_anesthesia_method}，拟选用麻醉药：{planned_anesthesia_drug}，
+访视麻醉史：{anesthesia_history}，麻醉计划风险评估时患者心功能分级(New York Heart Association)：{nyha_class}，
+访视中的特殊情况记录: {exam_notes}
+
+四. 医疗团队与支持人员:
+手术医生ID：{surgeon}，麻醉医生ID：{anesthesiologist}，
+巡回护士ID：{circulating_nurse}，洗手护士ID：{scrub_nurse}，
+手术房间ID：{surgery_room_id}，排班台次：{scheduling_shift}
+
+五. 手术紧急程度及特殊情况:
+手术等级：{surgery_level}，主要诊断：{primary_diagnosis}，
+手术注意事项：{surgery_notes}，总体评估时的ASA分级：{asa_grade}
+
+### 输出(min)：
+手术时长：{ground_true}

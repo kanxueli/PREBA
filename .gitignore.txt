@@ -1,0 +1,12 @@
+.venv/
+dist/
+__pycache__/
+checkpoints/
+wandb/
+results/
+*.ckpt
+cache/
+doctor_profiles_cache/
+predict_results/
+.vscode/
+cache/

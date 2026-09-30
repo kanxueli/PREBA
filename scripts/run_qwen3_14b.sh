@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0,2 vllm serve /home/data2/LLM_benchmarking/Qwen3-14B --port 8300 --reasoning-parser deepseek_r1 --tensor-parallel-size 2

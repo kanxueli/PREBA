@@ -1,0 +1,245 @@
+"""
+INSPIRE 结构化特征编码器：用于个体表示中的非文本部分（基本信息 + ASA + 急诊标识 + 日期 + ICD）。
+
+约定：
+- diagnoses_text / preop_labs_summary 等文本字段已在 text_representation 中编码，不在此处重复编码。
+- ICD 输出固定 3 维向量，便于与中文 MMSDP 的 ICD 处理保持一致风格。
+- 仅输出 continuous（float 矩阵），供 structured_branch 使用。
+"""
+
+import os
+import pickle
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OrdinalEncoder, OneHotEncoder, LabelEncoder
+
+
+INSPIRE_NUMERICAL = [
+    "patient_age",
+    "patient_height",
+    "patient_weight",
+    "surgery_start_time",
+]
+
+INSPIRE_ORDINAL = [
+    "assessment_asa",
+]
+
+INSPIRE_CATEGORICAL_LOW = [
+    "patient_gender",
+    "department",
+]
+
+INSPIRE_BOOLEAN = [
+    # prompt 中使用 emop（emergency operation）字段
+    "emop",
+]
+
+
+def _to_scalar(x):
+    if x is None:
+        return None
+    while isinstance(x, (list, tuple, np.ndarray)):
+        if len(x) == 0:
+            return None
+        x = x[0]
+    return x
+
+
+def _date_to_numeric(val):
+    if val is None:
+        return 0.0
+    try:
+        ts = pd.to_datetime(str(val), errors="coerce")
+        if pd.isna(ts):
+            return 0.0
+        return float(ts.toordinal())
+    except Exception:
+        return 0.0
+
+
+def _normalize_boolean(val):
+    if val is None:
+        return "false"
+    s = str(val).lower().strip()
+    if s in ("true", "t", "1", "yes", "y", "是"):
+        return "true"
+    return "false"
+
+
+def _diagnosis_code_to_fixed_dim(icd_val):
+    if icd_val is None or (isinstance(icd_val, float) and np.isnan(icd_val)):
+        return [0.0, 0.0, 0.0]
+    if isinstance(icd_val, (list, np.ndarray)):
+        arr = np.asarray(icd_val, dtype=float).flatten()
+        if arr.size >= 3:
+            return [float(arr[0]), float(arr[1]), float(arr[2])]
+        if arr.size == 1:
+            v = float(arr[0])
+            return [v / 100.0, (v % 100) / 100.0, (v % 10) / 10.0]
+        pad = [0.0] * (3 - arr.size)
+        return [float(x) for x in arr] + pad
+    try:
+        v = float(icd_val)
+    except (TypeError, ValueError):
+        s = str(icd_val).strip()
+        try:
+            v = float(s)
+        except ValueError:
+            return [0.0, 0.0, 0.0]
+    v = max(0.0, min(1000.0, v))
+    return [v / 100.0, (v % 100) / 100.0, (v % 10) / 10.0]
+
+
+class INSPIREStructuredEncoder:
+    def __init__(self):
+        self.scaler_numerical = StandardScaler()
+        self.encoder_ordinal = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
+        self.encoder_categorical_low = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+        self.encoder_boolean = LabelEncoder()
+        self._cat_low_cols = []
+        self._n_cat_low_out = 1
+        self.is_fitted = False
+
+    def _ensure_scalar_cells(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        for col in out.columns:
+            out[col] = out[col].map(lambda v: _to_scalar(v) if isinstance(v, (list, tuple, np.ndarray)) else v)
+        return out
+
+    def fit(self, data):
+        df = self._ensure_scalar_cells(data if isinstance(data, pd.DataFrame) else pd.DataFrame(data))
+
+        # numerical
+        X_num = np.zeros((len(df), len(INSPIRE_NUMERICAL)), dtype=np.float64)
+        for j, c in enumerate(INSPIRE_NUMERICAL):
+            if c not in df.columns:
+                continue
+            if c == "surgery_start_time":
+                X_num[:, j] = df[c].apply(_date_to_numeric).values
+            else:
+                X_num[:, j] = pd.to_numeric(df[c], errors="coerce").fillna(0).values
+        self.scaler_numerical.fit(X_num)
+
+        # ordinal
+        X_ord = df.reindex(columns=INSPIRE_ORDINAL).fillna("UNK")
+        self.encoder_ordinal.fit(X_ord)
+
+        # categorical_low
+        cat_low_cols = [c for c in INSPIRE_CATEGORICAL_LOW if c in df.columns]
+        self._cat_low_cols = cat_low_cols
+        if cat_low_cols:
+            X_cat = df[cat_low_cols].fillna("UNK")
+            self.encoder_categorical_low.fit(X_cat)
+            if hasattr(self.encoder_categorical_low, "categories_"):
+                self._n_cat_low_out = int(sum(len(cats) for cats in self.encoder_categorical_low.categories_))
+            else:
+                self._n_cat_low_out = 1
+        else:
+            self._n_cat_low_out = 1
+
+        # boolean
+        bool_vals = []
+        for c in INSPIRE_BOOLEAN:
+            if c in df.columns:
+                bool_vals.extend(_normalize_boolean(v) for v in df[c].tolist())
+        if bool_vals:
+            self.encoder_boolean.fit(np.array(["false", "true"] + list(set(bool_vals))))
+        else:
+            self.encoder_boolean.fit(np.array(["false", "true"]))
+
+        self.is_fitted = True
+        return self
+
+    def transform(self, data, return_dict: bool = False):
+        if not self.is_fitted:
+            raise ValueError("INSPIREStructuredEncoder 尚未 fit")
+        df = self._ensure_scalar_cells(data if isinstance(data, pd.DataFrame) else pd.DataFrame(data))
+        N = len(df)
+
+        parts = []
+        # numerical
+        X_num = np.zeros((N, len(INSPIRE_NUMERICAL)), dtype=np.float64)
+        for j, c in enumerate(INSPIRE_NUMERICAL):
+            if c not in df.columns:
+                continue
+            if c == "surgery_start_time":
+                X_num[:, j] = df[c].apply(_date_to_numeric).values
+            else:
+                X_num[:, j] = pd.to_numeric(df[c], errors="coerce").fillna(0).values
+        parts.append(self.scaler_numerical.transform(X_num))
+
+        # ordinal
+        X_ord = df.reindex(columns=INSPIRE_ORDINAL).fillna("UNK")
+        parts.append(self.encoder_ordinal.transform(X_ord))
+
+        # categorical_low
+        if self._cat_low_cols:
+            X_cat = df.reindex(columns=self._cat_low_cols).fillna("UNK")
+            parts.append(self.encoder_categorical_low.transform(X_cat))
+        else:
+            parts.append(np.zeros((N, self._n_cat_low_out), dtype=np.float64))
+
+        # boolean
+        bool_cols = [c for c in INSPIRE_BOOLEAN if c in df.columns]
+        if bool_cols:
+            bool_encoded = []
+            for c in bool_cols:
+                vals = [_normalize_boolean(v) for v in df[c].tolist()]
+                enc = self.encoder_boolean.transform(vals)
+                bool_encoded.append(enc.reshape(-1, 1))
+            parts.append(np.hstack(bool_encoded))
+        else:
+            parts.append(np.zeros((N, len(INSPIRE_BOOLEAN)), dtype=np.float64))
+
+        # ICD fixed dim
+        if "ICD" in df.columns:
+            icd_arr = np.array([_diagnosis_code_to_fixed_dim(v) for v in df["ICD"].tolist()], dtype=np.float64)
+            parts.append(icd_arr)
+        else:
+            parts.append(np.zeros((N, 3), dtype=np.float64))
+
+        continuous = np.hstack(parts).astype(np.float32, copy=False)
+        if return_dict:
+            return {"continuous": continuous}
+        return continuous
+
+    def get_continuous_dim(self) -> int:
+        if not self.is_fitted:
+            raise ValueError("尚未 fit")
+        return (
+            len(INSPIRE_NUMERICAL)
+            + len(INSPIRE_ORDINAL)
+            + self._n_cat_low_out
+            + len(INSPIRE_BOOLEAN)
+            + 3
+        )
+
+    def save(self, path: str) -> None:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "wb") as f:
+            pickle.dump(
+                {
+                    "scaler_numerical": self.scaler_numerical,
+                    "encoder_ordinal": self.encoder_ordinal,
+                    "encoder_categorical_low": self.encoder_categorical_low,
+                    "encoder_boolean": self.encoder_boolean,
+                    "_cat_low_cols": self._cat_low_cols,
+                    "_n_cat_low_out": self._n_cat_low_out,
+                    "is_fitted": self.is_fitted,
+                },
+                f,
+            )
+
+    def load(self, path: str):
+        with open(path, "rb") as f:
+            d = pickle.load(f)
+        self.scaler_numerical = d["scaler_numerical"]
+        self.encoder_ordinal = d["encoder_ordinal"]
+        self.encoder_categorical_low = d["encoder_categorical_low"]
+        self.encoder_boolean = d["encoder_boolean"]
+        self._cat_low_cols = d.get("_cat_low_cols", [])
+        self._n_cat_low_out = int(d.get("_n_cat_low_out", 1))
+        self.is_fitted = bool(d.get("is_fitted", True))
+        return self
+

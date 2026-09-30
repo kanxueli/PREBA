@@ -1,0 +1,8 @@
+Example {example_index}:
+### Input:
+1. Patient: Gender: {patient_gender}, Age: {patient_age}, Height: {patient_height}cm
+2. Procedure: {procedure_name}, Diagnosis: {diagnosis_names}, ASA grade: {assessment_asa}
+3. Surgery start time: {surgery_start_time}
+
+### Output (min):
+Surgery duration: {duration}

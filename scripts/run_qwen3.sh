@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0 vllm serve /home/data2/LLM_benchmarking/Qwen3-8B --port 60000 --reasoning-parser deepseek_r1

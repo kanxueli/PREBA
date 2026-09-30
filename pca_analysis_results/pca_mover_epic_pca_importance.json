@@ -1,0 +1,8 @@
+{
+  "diagnosis_names": 0.2764685760848651,
+  "procedure_name": 0.2705313595989901,
+  "patient_age": 0.15321583036350694,
+  "assessment_asa": 0.1358069479311642,
+  "patient_gender": 0.10262463446075577,
+  "patient_height": 0.061352651560717876
+}
